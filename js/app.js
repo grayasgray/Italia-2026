@@ -18,7 +18,6 @@ const App = {
     { id:'accommodation', label:'Accommodation', icon:'🏨',  color:'#14B8A6' },
     { id:'food',          label:'Food & Drink',  icon:'🍜',  color:'#F97316' },
     { id:'activity',      label:'Activity',      icon:'🎭',  color:'#10B981' },
-    { id:'free',          label:'Free Day',      icon:'☀️',  color:'#94A3B8' },
     { id:'admin',         label:'Admin',         icon:'📋',  color:'#EC4899' },
     { id:'other',         label:'Other',         icon:'📌',  color:'#64748B' }
   ],
@@ -58,7 +57,7 @@ const App = {
 
   categoriesForDay(dayKey) {
     const seen = new Set();
-    const priority = ['flight','accommodation','activity','food','transport','admin','other','free'];
+    const priority = ['flight','accommodation','activity','food','transport','admin','other'];
     const dayCats = this.eventsForDay(dayKey).map(e=>e.category).filter(Boolean);
     return priority.filter(p => dayCats.includes(p) && !seen.has(p) && seen.add(p));
   },
@@ -457,15 +456,34 @@ function getDayLocation(events) {
 // Build an Unsplash search URL for a location
 // Uses the free Unsplash source API — no key needed
 function unsplashURL(location) {
-  // Strip street-level detail — use only the first comma-separated part
-  // e.g. "Via Roma 12, Udine, Italy" → "Udine Italy"
+  // Extract city name — prefer second comma-segment (street, CITY, country)
   const parts = location.split(',');
-  // Prefer the second part if it exists (city), otherwise first
-  const query = (parts.length > 1 ? parts[1] : parts[0]).trim();
-  const encoded = encodeURIComponent(query + ' Italy');
-  // 800x400 landscape, random but consistent per query (via sig)
-  const sig = encodeURIComponent(query.toLowerCase().replace(/\s+/g,'-'));
-  return `https://source.unsplash.com/800x400/?${encoded}&sig=${sig}`;
+  const city  = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  // Use Unsplash's collection API via a CORS-friendly CDN proxy
+  // Falls back gracefully if the image fails (onerror handler on the img tag)
+  const query = encodeURIComponent(city + ' Italy landmark');
+  // picsum gives a deterministic landscape photo seeded by the city string hash
+  const seed  = city.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'italy';
+  return `https://picsum.photos/seed/${seed}/800/400`;
+}
+
+// Better: use Unsplash via a keyword search
+// We try Unsplash first (may be blocked by CORS), then fall back to picsum
+function locationImgHTML(location) {
+  const parts = location.split(',');
+  const city  = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  const query = encodeURIComponent(city + ' Italy');
+  // Unsplash via their free CDN (no API key needed for this endpoint)
+  const unsplash = `https://source.unsplash.com/featured/800x400/?${query}`;
+  // Picsum fallback — deterministic seed from city name
+  const seed = city.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,20)||'italy';
+  const picsum = `https://picsum.photos/seed/${seed}/800/400`;
+  return `<img
+    class="location-card-img"
+    src="${unsplash}"
+    alt="${city}"
+    onerror="this.src='${picsum}'"
+  />`;
 }
 
 function renderDayTab() {
@@ -508,7 +526,6 @@ function renderDayTab() {
 
   // ── Location card ──
   if (location) {
-    const imgURL = unsplashURL(location);
     // Display name: strip street number, show city-level text
     const parts   = location.split(',');
     const cityLine = (parts.length > 1 ? parts.slice(1).join(',') : parts[0]).trim();
@@ -516,12 +533,7 @@ function renderDayTab() {
     html += `
       <div class="location-card" id="loc-card-${dayKey}">
         <div class="location-card-img-wrap">
-          <img
-            class="location-card-img"
-            src="${imgURL}"
-            alt="${escHtml(cityLine)}"
-            onerror="this.parentElement.style.display='none'"
-          />
+          ${locationImgHTML(location)}
           <div class="location-card-img-overlay"></div>
         </div>
         <div class="location-card-body">
