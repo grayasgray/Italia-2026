@@ -1,4 +1,4 @@
-const CACHE = 'italia2026-v3';
+const CACHE = 'italia2026-v5';
 const ASSETS = [
   './',
   './index.html',
