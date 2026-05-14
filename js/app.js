@@ -445,6 +445,29 @@ async function refreshCalendar() {
 
 // ── Day Tab ───────────────────────────────────────────────────
 
+// Extract the best location string from a day's events
+function getDayLocation(events) {
+  // Priority: accommodation first (most likely to be a city/place name),
+  // then any event with a location
+  const byCategory = events.find(e => e.category === 'accommodation' && e.location);
+  if (byCategory) return byCategory.location;
+  return events.find(e => e.location)?.location || null;
+}
+
+// Build an Unsplash search URL for a location
+// Uses the free Unsplash source API — no key needed
+function unsplashURL(location) {
+  // Strip street-level detail — use only the first comma-separated part
+  // e.g. "Via Roma 12, Udine, Italy" → "Udine Italy"
+  const parts = location.split(',');
+  // Prefer the second part if it exists (city), otherwise first
+  const query = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  const encoded = encodeURIComponent(query + ' Italy');
+  // 800x400 landscape, random but consistent per query (via sig)
+  const sig = encodeURIComponent(query.toLowerCase().replace(/\s+/g,'-'));
+  return `https://source.unsplash.com/800x400/?${encoded}&sig=${sig}`;
+}
+
 function renderDayTab() {
   const dateEl = document.getElementById('day-tab-date');
   const metaEl = document.getElementById('day-tab-meta');
@@ -458,35 +481,64 @@ function renderDayTab() {
 
   dateEl.textContent = date.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  // Day number within trip
   const cfg = Store.getConfig();
   let meta = isToday ? 'Today' : '';
   if (cfg.startDate) {
     const start = new Date(cfg.startDate);
     const diff  = Math.round((date-start)/86400000)+1;
-    if (diff>=1 && diff<= (App.events.length>0 ? 999 : 0)+1) {
-      meta = (isToday?'Today · ':'') + `Day ${diff}`;
-    }
+    if (diff>=1) meta = (isToday?'Today · ':'') + `Day ${diff}`;
   }
   meta += events.length ? ` · ${events.length} event${events.length>1?'s':''}` : ' · Nothing scheduled';
   metaEl.textContent = meta;
 
-  if (events.length===0) {
+  // Find location for this day
+  const location = getDayLocation(events);
+
+  if (events.length===0 && !location) {
     body.innerHTML = `
       <div class="day-empty">
-        <div class="day-empty-icon">☀️</div>
+        <div class="day-empty-icon">📍</div>
         <div class="day-empty-title">Nothing scheduled</div>
-        <div class="day-empty-sub">A free day in Italy</div>
+        <div class="day-empty-sub">A free day — add events in Calendar.app</div>
       </div>`;
     return;
   }
 
-  const allDay = events.filter(e=>e.isAllDay);
-  const timed  = events.filter(e=>!e.isAllDay);
   let html = '';
 
+  // ── Location card ──
+  if (location) {
+    const imgURL = unsplashURL(location);
+    // Display name: strip street number, show city-level text
+    const parts   = location.split(',');
+    const cityLine = (parts.length > 1 ? parts.slice(1).join(',') : parts[0]).trim();
+    const subLine  = parts.length > 1 ? parts[0].trim() : '';
+    html += `
+      <div class="location-card" id="loc-card-${dayKey}">
+        <div class="location-card-img-wrap">
+          <img
+            class="location-card-img"
+            src="${imgURL}"
+            alt="${escHtml(cityLine)}"
+            onerror="this.parentElement.style.display='none'"
+          />
+          <div class="location-card-img-overlay"></div>
+        </div>
+        <div class="location-card-body">
+          <div class="location-card-pin">📍</div>
+          <div>
+            <div class="location-card-city">${escHtml(cityLine)}</div>
+            ${subLine ? `<div class="location-card-sub">${escHtml(subLine)}</div>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const allDay = events.filter(e=>e.isAllDay);
+  const timed  = events.filter(e=>!e.isAllDay);
+
   if (allDay.length) {
-    html += `<div class="allday-label">All day</div>
+    html += `<div class="allday-label" style="margin-top:${location?'4px':'0'}">All day</div>
       <div class="allday-card">
         ${allDay.map(e=>allDayRowHTML(e)).join('')}
       </div>`;
