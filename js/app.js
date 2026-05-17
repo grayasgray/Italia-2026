@@ -119,12 +119,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   }
-  if (!Store.isConfigured()) { showSetup(); return; }
+
+  // Debug: log what's in storage so we can diagnose issues
+  console.log('[Italia2026] Config:', JSON.stringify(Store.getConfig()));
+  console.log('[Italia2026] isConfigured:', Store.isConfigured());
+
+  if (!Store.isConfigured()) {
+    // Check if we have partial config — if so show recovery UI not full setup wipe
+    const cfg = Store.getConfig();
+    const hasPartial = cfg.tripName || cfg.calendarURL || cfg.apiKey;
+    if (hasPartial) {
+      // Something is missing but we have some data — go to settings to fix it
+      showLoading();
+      await loadEvents();
+      App.chatHistory = Store.getChatHistory();
+      showApp();
+      requestAnimationFrame(() => {
+        navigateTo('settings');
+        showToast('Please check your settings — something needs updating');
+      });
+      return;
+    }
+    showSetup();
+    return;
+  }
+
   showLoading();
   await loadEvents();
   App.chatHistory = Store.getChatHistory();
   showApp();
-  // Use rAF to ensure DOM is fully painted before navigating
   requestAnimationFrame(() => navigateTo('calendar'));
 });
 
@@ -141,20 +164,30 @@ function showLoading() {
 // ── Setup ─────────────────────────────────────────────────────
 
 function showSetup() {
+  // Pre-fill any values already saved — so updates never lose existing config
+  const existing = Store.getConfig();
   document.getElementById('app').innerHTML = `
     <div class="setup-screen">
       <img src="./icons/icon-192.png" class="setup-eagle" alt=""/>
       <h1 class="setup-title">Italia 2026</h1>
       <p class="setup-sub">Your travel companion</p>
       <div class="setup-form">
-        <input class="setup-input" id="s-name"  placeholder="Trip name"           value="Italia 2026"/>
-        <input class="setup-input" id="s-dest"  placeholder="Destination"/>
-        <input class="setup-input" id="s-start" placeholder="Start date (YYYY-MM-DD)" type="date"/>
-        <input class="setup-input" id="s-end"   placeholder="End date (YYYY-MM-DD)"   type="date"/>
-        <input class="setup-input" id="s-cal"   placeholder="iCloud ICS URL (webcal://…)"/>
-        <input class="setup-input" id="s-key"   placeholder="Anthropic API key (sk-ant-…)" type="password"/>
+        <input class="setup-input" id="s-name"  placeholder="Trip name"
+          value="${escAttr(existing.tripName || 'Italia 2026')}"/>
+        <input class="setup-input" id="s-dest"  placeholder="Destination"
+          value="${escAttr(existing.destination || '')}"/>
+        <input class="setup-input" id="s-start" placeholder="Start date" type="date"
+          value="${escAttr(existing.startDate || '')}"/>
+        <input class="setup-input" id="s-end"   placeholder="End date" type="date"
+          value="${escAttr(existing.endDate || '')}"/>
+        <input class="setup-input" id="s-cal"   placeholder="iCloud ICS URL (webcal://…)"
+          value="${escAttr(existing.calendarURL || '')}"/>
+        <input class="setup-input" id="s-key"   placeholder="Anthropic API key (sk-ant-…)"
+          type="password" value="${escAttr(existing.apiKey || '')}"/>
       </div>
-      <button class="btn btn-primary" style="max-width:380px;width:100%" onclick="saveSetup()">Get started</button>
+      <button class="btn btn-primary" style="max-width:380px;width:100%" onclick="saveSetup()">
+        ${existing.calendarURL ? 'Save changes' : 'Get started'}
+      </button>
       <p class="setup-footer">
         Your API key and calendar URL are stored only on this device.<br>
         Get your ICS link: Calendar.app → ⓘ next to your calendar → Public Calendar → Share Link.
@@ -981,52 +1014,52 @@ function clearChat() {
 // ── Settings ──────────────────────────────────────────────────
 
 function renderSettings() {
-  const body=document.getElementById('settings-body');
+  const body = document.getElementById('settings-body');
   if (!body) return;
-  const cfg=Store.getConfig();
-  body.innerHTML=`
+  const cfg = Store.getConfig();
+  body.innerHTML = `
     <span class="form-label" style="margin-top:16px;display:block">Trip</span>
     <div style="margin-bottom:2px">
-      <div class="settings-row" onclick="editSetting('tripName','Trip name',cfg)">
+      <div class="settings-row" onclick="editSetting('tripName','Trip name')">
         <div class="settings-row-left"><div class="settings-row-title">Trip name</div></div>
-        <div class="settings-row-right">${escHtml(cfg.tripName||'')} ›</div>
+        <div class="settings-row-right">${escHtml(cfg.tripName||'Not set')} ›</div>
       </div>
-      <div class="settings-row" onclick="editSetting('destination','Destination',cfg)">
+      <div class="settings-row" onclick="editSetting('destination','Destination')">
         <div class="settings-row-left"><div class="settings-row-title">Destination</div></div>
         <div class="settings-row-right">${escHtml(cfg.destination||'Not set')} ›</div>
       </div>
-      <div class="settings-row" onclick="editSetting('startDate','Start date (YYYY-MM-DD)',cfg)">
+      <div class="settings-row" onclick="editSetting('startDate','Start date')">
         <div class="settings-row-left"><div class="settings-row-title">Start date</div></div>
         <div class="settings-row-right">${cfg.startDate||'Not set'} ›</div>
       </div>
-      <div class="settings-row" onclick="editSetting('endDate','End date (YYYY-MM-DD)',cfg)">
+      <div class="settings-row" onclick="editSetting('endDate','End date')">
         <div class="settings-row-left"><div class="settings-row-title">End date</div></div>
         <div class="settings-row-right">${cfg.endDate||'Not set'} ›</div>
       </div>
     </div>
     <span class="form-label" style="display:block">Calendar</span>
     <div style="margin-bottom:2px">
-      <div class="settings-row" onclick="editSetting('calendarURL','iCloud ICS URL',cfg)">
+      <div class="settings-row" onclick="editSetting('calendarURL','iCloud ICS URL')">
         <div class="settings-row-left">
           <div class="settings-row-title">Calendar ICS URL</div>
-          <div class="settings-row-sub">${cfg.calendarURL?'✓ Configured':'Not set'}</div>
+          <div class="settings-row-sub">${cfg.calendarURL ? '✓ Configured' : 'Not set'}</div>
         </div>
         <div class="settings-row-right">›</div>
       </div>
       <div class="settings-row" onclick="refreshCalendar()">
         <div class="settings-row-left">
           <div class="settings-row-title">Refresh calendar</div>
-          <div class="settings-row-sub">Last updated: ${Store.eventCacheAge()<60000?'just now':'earlier'}</div>
+          <div class="settings-row-sub">Last updated: ${Store.eventCacheAge() < 60000 ? 'just now' : 'earlier'}</div>
         </div>
         <div class="settings-row-right">↻</div>
       </div>
     </div>
     <span class="form-label" style="display:block">Claude AI</span>
     <div style="margin-bottom:2px">
-      <div class="settings-row" onclick="editSetting('apiKey','Anthropic API key',cfg)">
+      <div class="settings-row" onclick="editSetting('apiKey','Anthropic API key')">
         <div class="settings-row-left">
           <div class="settings-row-title">API key</div>
-          <div class="settings-row-sub">${cfg.apiKey?'✓ Configured':'Not set'}</div>
+          <div class="settings-row-sub">${cfg.apiKey ? '✓ Configured' : 'Not set'}</div>
         </div>
         <div class="settings-row-right">›</div>
       </div>
@@ -1047,8 +1080,9 @@ function renderSettings() {
     </div>`;
 }
 
-function editSetting(key, label, cfg) {
-  // prompt() is blocked in iOS PWA standalone mode — use a sheet instead
+function editSetting(key, label) {
+  // Reads config fresh from Store — fixes the cfg variable scoping bug
+  const cfg = Store.getConfig();
   const current = cfg[key] || '';
   const isDate   = key === 'startDate' || key === 'endDate';
   const isSecret = key === 'apiKey' || key === 'calendarURL';
