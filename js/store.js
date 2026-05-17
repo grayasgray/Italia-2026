@@ -80,13 +80,29 @@ const Store = {
 
   cacheEvents(events) {
     // Store dates as ISO strings for JSON serialisation
-    const serialisable = events.map(e => ({
-      ...e,
-      startDate: e.startDate?.toISOString(),
-      endDate:   e.endDate?.toISOString()
-    }));
-    localStorage.setItem('ts_events', JSON.stringify(serialisable));
-    localStorage.setItem('ts_events_time', Date.now().toString());
+    // Strip 'raw' (original ICS block) to keep localStorage compact
+    const serialisable = events.map(e => {
+      const { raw, ...rest } = e;
+      return {
+        ...rest,
+        startDate: e.startDate?.toISOString(),
+        endDate:   e.endDate?.toISOString()
+      };
+    });
+    try {
+      localStorage.setItem('ts_events', JSON.stringify(serialisable));
+      localStorage.setItem('ts_events_time', Date.now().toString());
+    } catch(err) {
+      // QuotaExceededError — clear and retry once
+      console.warn('localStorage full, clearing old cache');
+      localStorage.removeItem('ts_events');
+      try {
+        localStorage.setItem('ts_events', JSON.stringify(serialisable));
+        localStorage.setItem('ts_events_time', Date.now().toString());
+      } catch(err2) {
+        console.error('Could not cache events:', err2);
+      }
+    }
   },
 
   restoreEvents() {

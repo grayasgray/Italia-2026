@@ -53,15 +53,21 @@ const ICSParser = {
       if (urlMatch) extractedURL = urlMatch[0];
     }
 
-    // Clean URL from notes
+    // Clean URL from notes and normalise escapes
     let cleanNotes = notes
       ? notes
           .replace(/\\n/g, '\n')
           .replace(/\\,/g, ',')
           .replace(/\\;/g, ';')
-          .replace(extractedURL || '', '')
-          .trim()
+          .replace(/\\\\/g, '\\')
       : null;
+    // Strip extracted URL from notes if present
+    if (cleanNotes && extractedURL) {
+      cleanNotes = cleanNotes.replace(extractedURL, '').trim();
+      // Clean up double spaces and orphan punctuation
+      cleanNotes = cleanNotes.replace(/\s+/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
+    }
+    if (cleanNotes === '') cleanNotes = null;
 
     return {
       id:           uid || `${summary}-${dtstart}`,

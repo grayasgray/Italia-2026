@@ -249,15 +249,19 @@ function refreshInBackground() {
   setTimeout(async () => {
     try {
       const url = Store.getCalendarURL();
+      if (!url) return;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
       const text = await ICSParser.fetchURL(url, controller.signal);
       clearTimeout(timer);
       const fresh = ICSParser.parse(text);
+      // Only update if event count or any title changed — avoids unnecessary re-renders
+      const oldSig = App.events.map(e=>e.id+e.title+e.startDate?.getTime()).join('|');
+      const newSig = fresh.map(e=>e.id+e.title+e.startDate?.getTime()).join('|');
+      if (oldSig === newSig) return;
       App.events = fresh;
       App.applyCategories();
       Store.cacheEvents(fresh);
-      // Re-render current screen silently
       if (App.activeScreen === 'calendar') renderCalendar();
       if (App.activeScreen === 'day') renderDayTab();
     } catch(e) {
@@ -274,8 +278,8 @@ function showApp() {
     <div id="screen-calendar" class="screen">
       <div class="topbar">
         <div>
-          <div class="topbar-title" id="cal-trip-name">${Store.getTripName()}</div>
-          <div class="topbar-sub" id="cal-trip-dest">${Store.getDestination()}</div>
+          <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
+          <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>
         <button class="topbar-btn" onclick="refreshCalendar()" title="Refresh">↻</button>
       </div>
@@ -620,7 +624,7 @@ function allDayRowHTML(event) {
   const catLabel = event.category ? App.getCategoryLabel(event.category) : 'Unassigned';
   const catColor = event.category ? color : 'rgba(255,255,255,0.38)';
   return `
-    <div class="entry-preview" onclick="openDetail('${event.id}')">
+    <div class="entry-preview" onclick="openDetail('${escJS(event.id)}')">
       <div class="entry-preview-bar" style="background:${catColor};height:36px"></div>
       <div class="entry-preview-body">
         <div class="entry-preview-title">${escHtml(event.title)}</div>
@@ -639,13 +643,13 @@ function entryCardHTML(event) {
   const accentColor = event.category ? color : 'rgba(255,255,255,0.12)';
 
   return `
-    <div class="entry-card" onclick="openDetail('${event.id}')">
+    <div class="entry-card" onclick="openDetail('${escJS(event.id)}')">
       <div class="entry-card-accent" style="background:${accentColor}"></div>
       <div class="entry-card-body">
         <div class="entry-card-header">
           <div class="entry-card-title">${escHtml(event.title)}</div>
           <span class="cat-badge" style="background:${catColor}22;color:${catColor}"
-                onclick="event.stopPropagation();openCategoryPicker('${event.id}')">
+                onclick="event.stopPropagation();openCategoryPicker('${escJS(event.id)}')">
             ${catIcon} ${catLabel}
           </span>
         </div>
@@ -676,7 +680,7 @@ function openDetail(eventId) {
     <div class="sheet-header">
       <div class="sheet-title">${escHtml(event.title)}</div>
       <span class="cat-badge" style="background:${catColor}22;color:${catColor};cursor:pointer"
-            onclick="openCategoryPicker('${event.id}')">
+            onclick="openCategoryPicker('${escJS(event.id)}')">
         ${catIcon} ${catLabel} — tap to change
       </span>
     </div>
@@ -731,14 +735,13 @@ function closeSheet(e) {
 // ── Category Picker ───────────────────────────────────────────
 
 function openCategoryPicker(eventId) {
-  document.getElementById('detail-sheet').classList.remove('open');
   const event   = App.events.find(e=>e.id===eventId);
   const current = event?.category;
 
   const grid = App.CATEGORIES.map(c=>`
     <div class="cat-option ${current===c.id?'selected':''}"
          style="${current===c.id?`border-color:${c.color}`:''}"
-         onclick="assignCategory('${eventId}','${c.id}')">
+         onclick="assignCategory('${escJS(eventId)}','${c.id}')">
       <div class="cat-option-swatch" style="background:${c.color}22;border:1px solid ${c.color}20">
         <span>${c.icon}</span>
       </div>
@@ -754,9 +757,10 @@ function openCategoryPicker(eventId) {
     <div class="cat-picker-grid">${grid}</div>
     ${current?`
     <div style="padding:0 16px 20px">
-      <button class="btn btn-danger" onclick="assignCategory('${eventId}',null)">Remove category</button>
+      <button class="btn btn-danger" onclick="assignCategory('${escJS(eventId)}',null)">Remove category</button>
     </div>`:''}`;
 
+  // Ensure sheet is open (no-op if already open)
   document.getElementById('detail-sheet').classList.add('open');
 }
 
@@ -868,7 +872,7 @@ function selectScanCat(catId, el, color) {
   el.style.borderWidth='2px';
 }
 
-function saveScanResult() {
+async function saveScanResult() {
   const title = document.getElementById('r-title')?.value.trim();
   if (!title) { showToast('Please enter a title'); return; }
   const date     = document.getElementById('r-date')?.value;
@@ -885,10 +889,26 @@ function saveScanResult() {
   if (ref)      lines.push(`Ref: ${ref}`);
   if (notes)    lines.push(`Notes: ${notes}`);
 
-  navigator.clipboard?.writeText(lines.join('\n')).catch(()=>{});
-  window.location.href='calshow://';
-  showToast('Details copied — Calendar.app opening…');
-  setTimeout(()=>{ renderScan(); navigateTo('calendar'); },1500);
+  // Copy summary to clipboard so user can paste into Calendar.app
+  const summary = lines.join('\n');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(summary);
+      showToast('Details copied — paste into Calendar.app');
+    } else {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = summary;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('Details copied to clipboard');
+    }
+  } catch(e) {
+    showToast('Details ready — long press notes to copy');
+  }
+  setTimeout(()=>{ renderScan(); },2000);
 }
 
 // ── Assistant ─────────────────────────────────────────────────
@@ -956,7 +976,7 @@ function renderSuggestions() {
     'Any travel tips for Italy?'
   ];
   row.innerHTML=chips.map(c=>
-    `<button class="suggestion-chip" onclick="sendSuggestion('${escAttr(c)}')">${escHtml(c)}</button>`
+    `<button class="suggestion-chip" onclick="sendSuggestion('${escJS(c)}')">${escHtml(c)}</button>`
   ).join('');
 }
 
@@ -1175,8 +1195,10 @@ function confirmClearCategories() {
   document.getElementById('detail-sheet').classList.remove('open');
   localStorage.removeItem('ts_categories');
   App.applyCategories();
+  // Re-render whichever screens may show colours
   renderCalendar();
   renderDayTab();
+  renderSettings();
   showToast('Categories cleared');
 }
 
@@ -1197,4 +1219,18 @@ function escHtml(str) {
 }
 function escAttr(str) {
   return String(str??'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+}
+
+// Escape a string so it can be safely embedded inside a JS string literal
+// within an HTML onclick="" attribute (double escape: JS quotes + HTML quotes)
+function escJS(str) {
+  return String(str??'')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
