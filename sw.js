@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-const CACHE = 'italia2026-v6';
-=======
-const CACHE = 'italia2026-v5';
->>>>>>> f7631870812752f0a070c5ded3630f7928728965
+const CACHE = 'italia2026-v7';
 const ASSETS = [
   './',
   './index.html',

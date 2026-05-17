@@ -114,22 +114,25 @@ const ICSParser = {
   },
 
   // Fetch a webcal:// or https:// ICS URL via a CORS proxy
-  async fetchURL(url) {
-    // Convert webcal:// to https://
+  async fetchURL(url, signal) {
     const httpsURL = url.replace(/^webcal:\/\//i, 'https://');
+    const opts = { cache: 'no-store', signal };
 
-    // Try direct fetch first (works if CORS headers are set)
+    // Try direct fetch first
     try {
-      const res = await fetch(httpsURL, { cache: 'no-store' });
+      const res = await fetch(httpsURL, opts);
       if (res.ok) {
         const text = await res.text();
         if (text.includes('BEGIN:VCALENDAR')) return text;
       }
-    } catch {}
+    } catch(e) {
+      // If aborted, propagate so timeout works
+      if (e.name === 'AbortError') throw e;
+    }
 
     // CORS proxy fallback
     const proxy = `https://corsproxy.io/?${encodeURIComponent(httpsURL)}`;
-    const res = await fetch(proxy, { cache: 'no-store' });
+    const res = await fetch(proxy, { cache: 'no-store', signal });
     if (!res.ok) throw new Error(`Failed to fetch calendar: ${res.status}`);
     return res.text();
   }

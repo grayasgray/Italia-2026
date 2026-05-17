@@ -124,7 +124,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadEvents();
   App.chatHistory = Store.getChatHistory();
   showApp();
-  navigateTo('calendar');
+  // Use rAF to ensure DOM is fully painted before navigating
+  requestAnimationFrame(() => navigateTo('calendar'));
 });
 
 // ── Loading ───────────────────────────────────────────────────
@@ -177,22 +178,59 @@ function saveSetup() {
 // ── Load events ───────────────────────────────────────────────
 
 async function loadEvents(forceRefresh=false) {
-  if (!forceRefresh && Store.eventCacheAge() < 10*60*1000) {
+  // Always try cache first — fast path that works offline and on home screen launch
+  if (!forceRefresh) {
     const cached = Store.restoreEvents();
-    if (cached && cached.length) { App.events=cached; App.applyCategories(); return; }
+    if (cached && cached.length) {
+      App.events = cached;
+      App.applyCategories();
+      // Refresh in background without blocking UI
+      refreshInBackground();
+      return;
+    }
   }
+  // No cache — must fetch (first launch or forced refresh)
+  await fetchWithTimeout();
+}
+
+async function fetchWithTimeout() {
   try {
-    const url  = Store.getCalendarURL();
-    const text = await ICSParser.fetchURL(url);
+    const url = Store.getCalendarURL();
+    // 10 second timeout — prevents hanging on home screen launch
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const text = await ICSParser.fetchURL(url, controller.signal);
+    clearTimeout(timer);
     App.events = ICSParser.parse(text);
     App.applyCategories();
     Store.cacheEvents(App.events);
   } catch(err) {
-    console.error('Calendar load failed:',err);
+    console.error('Calendar load failed:', err);
     const cached = Store.restoreEvents();
-    if (cached) { App.events=cached; App.applyCategories(); }
-    showToast('Could not refresh — showing cached data');
+    if (cached) { App.events = cached; App.applyCategories(); }
   }
+}
+
+function refreshInBackground() {
+  // Silently refresh calendar after app is shown — no loading screen
+  setTimeout(async () => {
+    try {
+      const url = Store.getCalendarURL();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const text = await ICSParser.fetchURL(url, controller.signal);
+      clearTimeout(timer);
+      const fresh = ICSParser.parse(text);
+      App.events = fresh;
+      App.applyCategories();
+      Store.cacheEvents(fresh);
+      // Re-render current screen silently
+      if (App.activeScreen === 'calendar') renderCalendar();
+      if (App.activeScreen === 'day') renderDayTab();
+    } catch(e) {
+      // Silent fail — cached data already shown
+    }
+  }, 1500);
 }
 
 // ── App shell ─────────────────────────────────────────────────
@@ -455,40 +493,7 @@ function getDayLocation(events) {
 
 // Build an Unsplash search URL for a location
 // Uses the free Unsplash source API — no key needed
-<<<<<<< HEAD
 
-=======
-function unsplashURL(location) {
-  // Extract city name — prefer second comma-segment (street, CITY, country)
-  const parts = location.split(',');
-  const city  = (parts.length > 1 ? parts[1] : parts[0]).trim();
-  // Use Unsplash's collection API via a CORS-friendly CDN proxy
-  // Falls back gracefully if the image fails (onerror handler on the img tag)
-  const query = encodeURIComponent(city + ' Italy landmark');
-  // picsum gives a deterministic landscape photo seeded by the city string hash
-  const seed  = city.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'italy';
-  return `https://picsum.photos/seed/${seed}/800/400`;
-}
-
-// Better: use Unsplash via a keyword search
-// We try Unsplash first (may be blocked by CORS), then fall back to picsum
-function locationImgHTML(location) {
-  const parts = location.split(',');
-  const city  = (parts.length > 1 ? parts[1] : parts[0]).trim();
-  const query = encodeURIComponent(city + ' Italy');
-  // Unsplash via their free CDN (no API key needed for this endpoint)
-  const unsplash = `https://source.unsplash.com/featured/800x400/?${query}`;
-  // Picsum fallback — deterministic seed from city name
-  const seed = city.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,20)||'italy';
-  const picsum = `https://picsum.photos/seed/${seed}/800/400`;
-  return `<img
-    class="location-card-img"
-    src="${unsplash}"
-    alt="${city}"
-    onerror="this.src='${picsum}'"
-  />`;
-}
->>>>>>> f7631870812752f0a070c5ded3630f7928728965
 
 function renderDayTab() {
   const dateEl = document.getElementById('day-tab-date');
@@ -535,15 +540,7 @@ function renderDayTab() {
     const cityLine = (parts.length > 1 ? parts.slice(1).join(',') : parts[0]).trim();
     const subLine  = parts.length > 1 ? parts[0].trim() : '';
     html += `
-<<<<<<< HEAD
       <div class="location-card">
-=======
-      <div class="location-card" id="loc-card-${dayKey}">
-        <div class="location-card-img-wrap">
-          ${locationImgHTML(location)}
-          <div class="location-card-img-overlay"></div>
-        </div>
->>>>>>> f7631870812752f0a070c5ded3630f7928728965
         <div class="location-card-body">
           <div class="location-card-pin">📍</div>
           <div>
