@@ -18,7 +18,6 @@ const App = {
     { id:'accommodation', label:'Accommodation', icon:'🏨',  color:'#14B8A6' },
     { id:'food',          label:'Food & Drink',  icon:'🍜',  color:'#F97316' },
     { id:'activity',      label:'Activity',      icon:'🎭',  color:'#10B981' },
-    { id:'free',          label:'Free Day',      icon:'☀️',  color:'#94A3B8' },
     { id:'admin',         label:'Admin',         icon:'📋',  color:'#EC4899' },
     { id:'other',         label:'Other',         icon:'📌',  color:'#64748B' }
   ],
@@ -58,7 +57,7 @@ const App = {
 
   categoriesForDay(dayKey) {
     const seen = new Set();
-    const priority = ['flight','accommodation','activity','food','transport','admin','other','free'];
+    const priority = ['flight','accommodation','activity','food','transport','admin','other'];
     const dayCats = this.eventsForDay(dayKey).map(e=>e.category).filter(Boolean);
     return priority.filter(p => dayCats.includes(p) && !seen.has(p) && seen.add(p));
   },
@@ -456,17 +455,7 @@ function getDayLocation(events) {
 
 // Build an Unsplash search URL for a location
 // Uses the free Unsplash source API — no key needed
-function unsplashURL(location) {
-  // Strip street-level detail — use only the first comma-separated part
-  // e.g. "Via Roma 12, Udine, Italy" → "Udine Italy"
-  const parts = location.split(',');
-  // Prefer the second part if it exists (city), otherwise first
-  const query = (parts.length > 1 ? parts[1] : parts[0]).trim();
-  const encoded = encodeURIComponent(query + ' Italy');
-  // 800x400 landscape, random but consistent per query (via sig)
-  const sig = encodeURIComponent(query.toLowerCase().replace(/\s+/g,'-'));
-  return `https://source.unsplash.com/800x400/?${encoded}&sig=${sig}`;
-}
+
 
 function renderDayTab() {
   const dateEl = document.getElementById('day-tab-date');
@@ -508,22 +497,12 @@ function renderDayTab() {
 
   // ── Location card ──
   if (location) {
-    const imgURL = unsplashURL(location);
     // Display name: strip street number, show city-level text
     const parts   = location.split(',');
     const cityLine = (parts.length > 1 ? parts.slice(1).join(',') : parts[0]).trim();
     const subLine  = parts.length > 1 ? parts[0].trim() : '';
     html += `
-      <div class="location-card" id="loc-card-${dayKey}">
-        <div class="location-card-img-wrap">
-          <img
-            class="location-card-img"
-            src="${imgURL}"
-            alt="${escHtml(cityLine)}"
-            onerror="this.parentElement.style.display='none'"
-          />
-          <div class="location-card-img-overlay"></div>
-        </div>
+      <div class="location-card">
         <div class="location-card-body">
           <div class="location-card-pin">📍</div>
           <div>
