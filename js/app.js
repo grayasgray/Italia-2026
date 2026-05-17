@@ -1047,25 +1047,98 @@ function renderSettings() {
     </div>`;
 }
 
-function editSetting(key,label,cfg) {
-  const current=cfg[key]||'';
-  const newVal=prompt(`${label}:`,current);
-  if (newVal===null) return;
-  cfg[key]=newVal.trim();
+function editSetting(key, label, cfg) {
+  // prompt() is blocked in iOS PWA standalone mode — use a sheet instead
+  const current = cfg[key] || '';
+  const isDate   = key === 'startDate' || key === 'endDate';
+  const isSecret = key === 'apiKey' || key === 'calendarURL';
+
+  document.getElementById('sheet-content').innerHTML = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">${escHtml(label)}</div>
+    </div>
+    <div style="padding:20px">
+      ${isDate
+        ? `<input id="edit-val" type="date" class="form-input"
+              style="width:100%;background:var(--surface-2);border:1px solid var(--line-2);
+                     border-radius:var(--r-md);padding:12px 14px;font-size:16px;color:var(--text);
+                     font-family:var(--font)"
+              value="${escAttr(current)}"/>`
+        : `<input id="edit-val"
+              type="${isSecret ? 'text' : 'text'}"
+              class="form-input"
+              style="width:100%;background:var(--surface-2);border:1px solid var(--line-2);
+                     border-radius:var(--r-md);padding:12px 14px;font-size:16px;color:var(--text);
+                     font-family:var(--font)"
+              value="${escAttr(current)}"
+              placeholder="${escAttr(label)}"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+           />`
+      }
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-secondary" style="flex:1"
+          onclick="document.getElementById('detail-sheet').classList.remove('open')">
+          Cancel
+        </button>
+        <button class="btn btn-primary" style="flex:1"
+          onclick="saveEditSetting('${key}')">
+          Save
+        </button>
+      </div>
+    </div>`;
+
+  document.getElementById('detail-sheet').classList.add('open');
+
+  // Focus and select after sheet animates in
+  setTimeout(() => {
+    const input = document.getElementById('edit-val');
+    if (input) { input.focus(); input.select(); }
+  }, 350);
+}
+
+function saveEditSetting(key) {
+  const input = document.getElementById('edit-val');
+  if (!input) return;
+  const newVal = input.value.trim();
+  const cfg = Store.getConfig();
+  cfg[key] = newVal;
   Store.saveConfig(cfg);
+  document.getElementById('detail-sheet').classList.remove('open');
   renderSettings();
-  if (key==='tripName'||key==='destination') {
-    const n=document.getElementById('cal-trip-name');
-    const d=document.getElementById('cal-trip-dest');
-    if (n) n.textContent=Store.getTripName();
-    if (d) d.textContent=Store.getDestination();
+  if (key === 'tripName' || key === 'destination') {
+    const n = document.getElementById('cal-trip-name');
+    const d = document.getElementById('cal-trip-dest');
+    if (n) n.textContent = Store.getTripName();
+    if (d) d.textContent = Store.getDestination();
   }
-  if (key==='calendarURL') refreshCalendar();
+  if (key === 'calendarURL') refreshCalendar();
   showToast('Saved');
 }
 
 function clearAllCategories() {
-  if (!confirm('Remove all category colour assignments on this device?')) return;
+  // confirm() blocked in iOS PWA — use sheet
+  document.getElementById('sheet-content').innerHTML = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Clear categories?</div>
+      <p style="font-size:14px;color:var(--muted);margin-top:4px">
+        This removes all colour assignments on this device. Your calendar events are not affected.
+      </p>
+    </div>
+    <div style="padding:16px 20px 24px;display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-danger" onclick="confirmClearCategories()">Yes, clear all</button>
+      <button class="btn btn-secondary"
+        onclick="document.getElementById('detail-sheet').classList.remove('open')">Cancel</button>
+    </div>`;
+  document.getElementById('detail-sheet').classList.add('open');
+}
+
+function confirmClearCategories() {
+  document.getElementById('detail-sheet').classList.remove('open');
   localStorage.removeItem('ts_categories');
   App.applyCategories();
   renderCalendar();
