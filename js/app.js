@@ -455,7 +455,40 @@ function getDayLocation(events) {
 
 // Build an Unsplash search URL for a location
 // Uses the free Unsplash source API — no key needed
+<<<<<<< HEAD
 
+=======
+function unsplashURL(location) {
+  // Extract city name — prefer second comma-segment (street, CITY, country)
+  const parts = location.split(',');
+  const city  = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  // Use Unsplash's collection API via a CORS-friendly CDN proxy
+  // Falls back gracefully if the image fails (onerror handler on the img tag)
+  const query = encodeURIComponent(city + ' Italy landmark');
+  // picsum gives a deterministic landscape photo seeded by the city string hash
+  const seed  = city.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'italy';
+  return `https://picsum.photos/seed/${seed}/800/400`;
+}
+
+// Better: use Unsplash via a keyword search
+// We try Unsplash first (may be blocked by CORS), then fall back to picsum
+function locationImgHTML(location) {
+  const parts = location.split(',');
+  const city  = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  const query = encodeURIComponent(city + ' Italy');
+  // Unsplash via their free CDN (no API key needed for this endpoint)
+  const unsplash = `https://source.unsplash.com/featured/800x400/?${query}`;
+  // Picsum fallback — deterministic seed from city name
+  const seed = city.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,20)||'italy';
+  const picsum = `https://picsum.photos/seed/${seed}/800/400`;
+  return `<img
+    class="location-card-img"
+    src="${unsplash}"
+    alt="${city}"
+    onerror="this.src='${picsum}'"
+  />`;
+}
+>>>>>>> f7631870812752f0a070c5ded3630f7928728965
 
 function renderDayTab() {
   const dateEl = document.getElementById('day-tab-date');
@@ -502,7 +535,15 @@ function renderDayTab() {
     const cityLine = (parts.length > 1 ? parts.slice(1).join(',') : parts[0]).trim();
     const subLine  = parts.length > 1 ? parts[0].trim() : '';
     html += `
+<<<<<<< HEAD
       <div class="location-card">
+=======
+      <div class="location-card" id="loc-card-${dayKey}">
+        <div class="location-card-img-wrap">
+          ${locationImgHTML(location)}
+          <div class="location-card-img-overlay"></div>
+        </div>
+>>>>>>> f7631870812752f0a070c5ded3630f7928728965
         <div class="location-card-body">
           <div class="location-card-pin">📍</div>
           <div>
