@@ -188,18 +188,18 @@ body {
           backdrop-filter: blur(24px) saturate(160%);
   border: 0.5px solid var(--line);
   border-radius: 22px;
-  padding: 10px 8px;
-  padding-bottom: calc(10px + var(--sab));
+  padding: 6px 8px;
+  padding-bottom: calc(6px + var(--sab));
   box-shadow: var(--shadow-2);
-  display: flex; justify-content: space-around;
+  display: flex; justify-content: space-around; align-items: center;
 }
 .nav-item {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 4px 8px; border-radius: 14px;
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px 6px; border-radius: 12px;
   cursor: pointer; border: none; background: none;
   color: var(--muted);
   font-family: var(--font);
-  font-size: 17px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
   transition: color 0.15s;
 }
 .nav-item.active { color: var(--accent); }
@@ -262,8 +262,8 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .cal-day.not-in-trip .cal-day-num { color: var(--dim); }
-.cal-dots { display: flex; gap: 2px; align-items: center; height: 5px; }
-.cal-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+.cal-dots { display: flex; gap: 3px; align-items: center; height: 8px; }
+.cal-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .cal-dot.unassigned { background: transparent; border: 1px solid var(--dim); }
 
 /* ── DAY STRIP ────────────────────────────────────────────────────────── */
