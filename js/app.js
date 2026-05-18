@@ -13,6 +13,7 @@ const App = {
   activeScreen:  'calendar',
 
   CATEGORIES: [
+    { id:'place',         label:'Place',         icon:'📍',  color:'#C9A96E' },
     { id:'flight',        label:'Flight',        icon:'✈️',  color:'#5B8CFF' },
     { id:'transport',     label:'Transport',     icon:'🚌',  color:'#A78BFA' },
     { id:'accommodation', label:'Accommodation', icon:'🏨',  color:'#14B8A6' },
@@ -28,7 +29,9 @@ const App = {
 
   applyCategories() {
     this.events.forEach(e => {
-      e.category = Store.getCategoryFor(e.id) || null;
+      // For multi-day span events, look up by base ID so all days share one assignment
+      const lookupId = e.spanBaseId || e.id;
+      e.category = Store.getCategoryFor(lookupId) || null;
     });
   },
 
@@ -519,19 +522,6 @@ async function refreshCalendar() {
 
 // ── Day Tab ───────────────────────────────────────────────────
 
-// Extract the best location string from a day's events
-function getDayLocation(events) {
-  // Priority: accommodation first (most likely to be a city/place name),
-  // then any event with a location
-  const byCategory = events.find(e => e.category === 'accommodation' && e.location);
-  if (byCategory) return byCategory.location;
-  return events.find(e => e.location)?.location || null;
-}
-
-// Build an Unsplash search URL for a location
-// Uses the free Unsplash source API — no key needed
-
-
 function renderDayTab() {
   const dateEl = document.getElementById('day-tab-date');
   const metaEl = document.getElementById('day-tab-meta');
@@ -555,10 +545,10 @@ function renderDayTab() {
   meta += events.length ? ` · ${events.length} event${events.length>1?'s':''}` : ' · Nothing scheduled';
   metaEl.textContent = meta;
 
-  // Find location for this day
-  const location = getDayLocation(events);
+  // Find the Place-categorised event for this day
+  const placeEvent = events.find(e => e.category === 'place');
 
-  if (events.length===0 && !location) {
+  if (events.length===0) {
     body.innerHTML = `
       <div class="day-empty">
         <div class="day-empty-icon">📍</div>
@@ -570,29 +560,23 @@ function renderDayTab() {
 
   let html = '';
 
-  // ── Location card ──
-  if (location) {
-    // Display name: strip street number, show city-level text
-    const parts   = location.split(',');
-    const cityLine = (parts.length > 1 ? parts.slice(1).join(',') : parts[0]).trim();
-    const subLine  = parts.length > 1 ? parts[0].trim() : '';
+  // ── Place card — shown when an event is tagged as Place ──
+  // Title is the city name (user controls this in Calendar.app)
+  if (placeEvent) {
     html += `
-      <div class="location-card">
-        <div class="location-card-body">
-          <div class="location-card-pin">📍</div>
-          <div>
-            <div class="location-card-city">${escHtml(cityLine)}</div>
-            ${subLine ? `<div class="location-card-sub">${escHtml(subLine)}</div>` : ''}
-          </div>
-        </div>
+      <div class="place-card">
+        <div class="place-card-pin">📍</div>
+        <div class="place-card-city">${escHtml(placeEvent.title)}</div>
       </div>`;
   }
 
-  const allDay = events.filter(e=>e.isAllDay);
-  const timed  = events.filter(e=>!e.isAllDay);
+  // Filter place events out of the main list — they only show in the top card
+  const nonPlaceEvents = events.filter(e => e.category !== 'place');
+  const allDay = nonPlaceEvents.filter(e=>e.isAllDay);
+  const timed  = nonPlaceEvents.filter(e=>!e.isAllDay);
 
   if (allDay.length) {
-    html += `<div class="allday-label" style="margin-top:${location?'4px':'0'}">All day</div>
+    html += `<div class="allday-label" style="margin-top:${placeEvent?'4px':'0'}">All day</div>
       <div class="allday-card">
         ${allDay.map(e=>allDayRowHTML(e)).join('')}
       </div>`;
@@ -765,8 +749,11 @@ function openCategoryPicker(eventId) {
 }
 
 function assignCategory(eventId, category) {
-  if (category) Store.assignCategory(eventId,category);
-  else Store.removeCategory(eventId);
+  // If this is a span day, save against the base ID so all days update
+  const event = App.events.find(e => e.id === eventId);
+  const saveId = event?.spanBaseId || eventId;
+  if (category) Store.assignCategory(saveId, category);
+  else Store.removeCategory(saveId);
   App.applyCategories();
   document.getElementById('detail-sheet').classList.remove('open');
   if (App.activeScreen==='calendar') renderCalendar();

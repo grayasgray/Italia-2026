@@ -10,7 +10,37 @@ const ICSParser = {
     for (let i = 1; i < blocks.length; i++) {
       const block = blocks[i].split('END:VEVENT')[0];
       const event = this.parseEvent(block);
-      if (event) events.push(event);
+      if (!event) continue;
+
+      // Expand multi-day all-day events into one entry per day
+      // ICS spec: DTEND for all-day events is exclusive (end day not included)
+      if (event.isAllDay && event.endDate && event.endDate > event.startDate) {
+        const msPerDay = 86400000;
+        // Count how many days this event spans (endDate is exclusive so subtract 1)
+        const spanDays = Math.round((event.endDate - event.startDate) / msPerDay);
+
+        if (spanDays > 1) {
+          // Create one entry per day
+          for (let d = 0; d < spanDays; d++) {
+            const dayDate = new Date(event.startDate.getTime() + d * msPerDay);
+            events.push({
+              ...event,
+              // Give each day-entry a unique ID to avoid collisions
+              id: d === 0 ? event.id : `${event.id}_day${d}`,
+              startDate: dayDate,
+              endDate:   dayDate,
+              dayKey:    this.toDayKey(dayDate),
+              // Mark as a span so category picker still updates the base ID
+              spanBaseId: event.id,
+              spanDay: d,
+              spanTotal: spanDays
+            });
+          }
+          continue; // Don't push original
+        }
+      }
+
+      events.push(event);
     }
 
     return events.sort((a, b) => a.startDate - b.startDate);
