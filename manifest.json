@@ -4,8 +4,8 @@
   "description": "Your personal Italy travel companion",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f1117",
-  "theme_color": "#0f1117",
+  "background_color": "#E8EAE4",
+  "theme_color": "#E8EAE4",
   "orientation": "portrait",
   "icons": [
     {

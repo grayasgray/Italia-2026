@@ -120,7 +120,36 @@ const App = {
 
 document.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    // Register SW and listen for updates
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+
+      // Check for update immediately on load
+      reg.update();
+
+      // When a new SW is waiting, tell it to activate immediately
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available — activate it and reload
+            newWorker.postMessage('SKIP_WAITING');
+          }
+        });
+      });
+
+      // When SW has taken control (after update), reload to get new files
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    } catch(e) {
+      console.log('SW registration failed:', e);
+    }
   }
 
   // Debug: log what's in storage so we can diagnose issues
@@ -484,6 +513,42 @@ function renderCalendar() {
         <span>Unassigned</span>
       </div>
     </div>`;
+
+  // Attach swipe gesture to calendar grid after render
+  attachCalendarSwipe(container);
+}
+
+function attachCalendarSwipe(container) {
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+
+  container.addEventListener('touchstart', e => {
+    touchStartX    = e.touches[0].clientX;
+    touchStartY    = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  container.addEventListener('touchend', e => {
+    const dx       = e.changedTouches[0].clientX - touchStartX;
+    const dy       = e.changedTouches[0].clientY - touchStartY;
+    const elapsed  = Date.now() - touchStartTime;
+
+    // Valid swipe: mostly horizontal, fast enough, long enough
+    const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
+    const isFast       = elapsed < 400;
+    const isLongEnough = Math.abs(dx) > 40;
+
+    if (!isHorizontal || !isFast || !isLongEnough) return;
+
+    if (dx < 0) {
+      // Swipe left → next month
+      changeMonth(1);
+    } else {
+      // Swipe right → previous month
+      changeMonth(-1);
+    }
+  }, { passive: true });
 }
 
 function entryPreviewHTML(event) {
@@ -585,6 +650,39 @@ function renderDayTab() {
   timed.forEach(e => { html += entryCardHTML(e); });
 
   body.innerHTML = html;
+
+  // Attach swipe gesture to day cards scroll
+  attachDayTabSwipe(body);
+}
+
+function attachDayTabSwipe(body) {
+  let touchStartX    = 0;
+  let touchStartY    = 0;
+  let touchStartTime = 0;
+
+  body.addEventListener('touchstart', e => {
+    touchStartX    = e.touches[0].clientX;
+    touchStartY    = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  body.addEventListener('touchend', e => {
+    const dx      = e.changedTouches[0].clientX - touchStartX;
+    const dy      = e.changedTouches[0].clientY - touchStartY;
+    const elapsed = Date.now() - touchStartTime;
+
+    const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
+    const isFast       = elapsed < 400;
+    const isLongEnough = Math.abs(dx) > 40;
+
+    if (!isHorizontal || !isFast || !isLongEnough) return;
+
+    if (dx < 0) {
+      dayTabMove(1);   // Swipe left → next day
+    } else {
+      dayTabMove(-1);  // Swipe right → previous day
+    }
+  }, { passive: true });
 }
 
 function dayTabMove(dir) {
@@ -1081,10 +1179,31 @@ function renderSettings() {
         <div class="settings-row-right" style="color:var(--danger)">Clear</div>
       </div>
     </div>
-    <div style="padding:24px 16px;text-align:center">
-      <p style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:0.08em;text-transform:uppercase">Italia 2026 · Personal travel companion</p>
-      <p style="font-size:11px;color:var(--dim);margin-top:4px">All data stored on this device only</p>
+    <span class="form-label" style="display:block">Appearance</span>
+    <div>
+      <div class="settings-row" onclick="toggleTheme()">
+        <div class="settings-row-left">
+          <div class="settings-row-title">Theme</div>
+          <div class="settings-row-sub" id="theme-label">${document.documentElement.hasAttribute('data-theme') ? 'Dark mode' : 'Light mode'}</div>
+        </div>
+        <div class="settings-row-right" id="theme-icon">${document.documentElement.hasAttribute('data-theme') ? '☀️' : '🌙'}</div>
+      </div>
+    </div>
+    <div style="padding:28px 16px 16px;text-align:center">
+      <p style="font-family:var(--font);font-style:italic;font-size:11px;color:var(--dim)">Italia 2026 &nbsp;·&nbsp; All data stored on this device</p>
     </div>`;
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.hasAttribute('data-theme');
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('ts_theme', 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('ts_theme', 'dark');
+  }
+  renderSettings();
 }
 
 function editSetting(key, label) {
