@@ -10,10 +10,11 @@
   <!-- Default to dark theme, matches device preference -->
   <script>
     (function() {
+      // Default to light (Alpino alpine palette)
+      // User can switch to dark in Settings if preferred
       const saved = localStorage.getItem('ts_theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = saved || (prefersDark ? 'dark' : 'light');
-      if (theme === 'dark') document.documentElement.setAttribute('data-theme','dark');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+      // If no saved preference, light mode is the default — no attribute needed
     })();
   </script>
   <meta name="theme-color" content="#E8EAE4" media="(prefers-color-scheme: light)"/>

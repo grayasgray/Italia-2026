@@ -483,15 +483,17 @@ function renderCalendar() {
   const selLabel   = App.selectedDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
 
   container.innerHTML = `
-    <div class="cal-month-nav">
-      <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
-      <span class="cal-month-label">${monthLabel}</span>
-      <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+    <div class="cal-card">
+      <div class="cal-month-nav">
+        <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+        <span class="cal-month-label">${monthLabel}</span>
+        <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="cal-dow">
+        ${['S','M','T','W','T','F','S'].map(d=>`<span>${d}</span>`).join('')}
+      </div>
+      <div class="cal-grid">${gridHTML}</div>
     </div>
-    <div class="cal-dow">
-      ${['S','M','T','W','T','F','S'].map(d=>`<span>${d}</span>`).join('')}
-    </div>
-    <div class="cal-grid">${gridHTML}</div>
 
     <div class="day-strip">
       <div class="day-strip-header">
