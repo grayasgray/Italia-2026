@@ -411,6 +411,8 @@ function showApp() {
   renderScan();
   renderSettings();
   initAssistant();
+  // Attach swipe once — must be after innerHTML is set
+  requestAnimationFrame(initSwipeGestures);
 }
 
 // ── Navigation ────────────────────────────────────────────────
@@ -514,41 +516,45 @@ function renderCalendar() {
       </div>
     </div>`;
 
-  // Attach swipe gesture to calendar grid after render
-  attachCalendarSwipe(container);
 }
 
-function attachCalendarSwipe(container) {
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let touchStartTime = 0;
+// ── Swipe gestures — attached ONCE to stable containers ─────────────────
+// Called from showApp() so listeners are never stacked up on re-renders.
+function initSwipeGestures() {
+  function makeSwipeHandler(onLeft, onRight) {
+    let x0 = 0, y0 = 0, t0 = 0;
+    return {
+      start(e) {
+        x0 = e.touches[0].clientX;
+        y0 = e.touches[0].clientY;
+        t0 = Date.now();
+      },
+      end(e) {
+        const dx = e.changedTouches[0].clientX - x0;
+        const dy = e.changedTouches[0].clientY - y0;
+        const dt = Date.now() - t0;
+        if (Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 400 && Math.abs(dx) > 44) {
+          dx < 0 ? onLeft() : onRight();
+        }
+      }
+    };
+  }
 
-  container.addEventListener('touchstart', e => {
-    touchStartX    = e.touches[0].clientX;
-    touchStartY    = e.touches[0].clientY;
-    touchStartTime = Date.now();
-  }, { passive: true });
+  // Calendar screen — swipe on the whole screen
+  const calScreen = document.getElementById('screen-calendar');
+  if (calScreen) {
+    const h = makeSwipeHandler(() => changeMonth(1), () => changeMonth(-1));
+    calScreen.addEventListener('touchstart', e => h.start(e), { passive: true });
+    calScreen.addEventListener('touchend',   e => h.end(e),   { passive: true });
+  }
 
-  container.addEventListener('touchend', e => {
-    const dx       = e.changedTouches[0].clientX - touchStartX;
-    const dy       = e.changedTouches[0].clientY - touchStartY;
-    const elapsed  = Date.now() - touchStartTime;
-
-    // Valid swipe: mostly horizontal, fast enough, long enough
-    const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
-    const isFast       = elapsed < 400;
-    const isLongEnough = Math.abs(dx) > 40;
-
-    if (!isHorizontal || !isFast || !isLongEnough) return;
-
-    if (dx < 0) {
-      // Swipe left → next month
-      changeMonth(1);
-    } else {
-      // Swipe right → previous month
-      changeMonth(-1);
-    }
-  }, { passive: true });
+  // Day tab — swipe on the scroll container
+  const dayScreen = document.getElementById('screen-day');
+  if (dayScreen) {
+    const h = makeSwipeHandler(() => dayTabMove(1), () => dayTabMove(-1));
+    dayScreen.addEventListener('touchstart', e => h.start(e), { passive: true });
+    dayScreen.addEventListener('touchend',   e => h.end(e),   { passive: true });
+  }
 }
 
 function entryPreviewHTML(event) {
@@ -651,38 +657,6 @@ function renderDayTab() {
 
   body.innerHTML = html;
 
-  // Attach swipe gesture to day cards scroll
-  attachDayTabSwipe(body);
-}
-
-function attachDayTabSwipe(body) {
-  let touchStartX    = 0;
-  let touchStartY    = 0;
-  let touchStartTime = 0;
-
-  body.addEventListener('touchstart', e => {
-    touchStartX    = e.touches[0].clientX;
-    touchStartY    = e.touches[0].clientY;
-    touchStartTime = Date.now();
-  }, { passive: true });
-
-  body.addEventListener('touchend', e => {
-    const dx      = e.changedTouches[0].clientX - touchStartX;
-    const dy      = e.changedTouches[0].clientY - touchStartY;
-    const elapsed = Date.now() - touchStartTime;
-
-    const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
-    const isFast       = elapsed < 400;
-    const isLongEnough = Math.abs(dx) > 40;
-
-    if (!isHorizontal || !isFast || !isLongEnough) return;
-
-    if (dx < 0) {
-      dayTabMove(1);   // Swipe left → next day
-    } else {
-      dayTabMove(-1);  // Swipe right → previous day
-    }
-  }, { passive: true });
 }
 
 function dayTabMove(dir) {
