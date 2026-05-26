@@ -421,7 +421,7 @@ body {
   box-shadow: var(--shadow-1);
 }
 .entry-card:hover { box-shadow: var(--shadow-2); transform: translateY(-1px); }
-.entry-card-accent { height: 2px; }
+.entry-card-accent { display: none; }
 .entry-card-body { padding: 12px 14px 13px; }
 .entry-card-header {
   display: flex; align-items: flex-start;
@@ -766,3 +766,13 @@ body {
 }
 .cal-card .cal-dow { padding: 6px 10px 0; }
 .cal-card .cal-grid { padding: 4px 10px 12px; }
+
+/* ── Plain category badge — no pill, just icon + text ── */
+.cat-badge-plain {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font); font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0; cursor: pointer; border: none;
+  background: none; padding: 2px 0;
+  white-space: nowrap;
+}

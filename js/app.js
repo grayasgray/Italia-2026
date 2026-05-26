@@ -19,6 +19,7 @@ const App = {
     { id:'accommodation', label:'Accommodation', icon:'🏨',  color:'#14B8A6' },
     { id:'food',          label:'Food & Drink',  icon:'🍜',  color:'#F97316' },
     { id:'activity',      label:'Activity',      icon:'🎭',  color:'#10B981' },
+    { id:'recharge',      label:'Recharge',      icon:'🌿',  color:'#7CAE9E' },
     { id:'admin',         label:'Admin',         icon:'📋',  color:'#EC4899' },
     { id:'other',         label:'Other',         icon:'📌',  color:'#64748B' }
   ],
@@ -680,15 +681,16 @@ function jumpDayTab(dayKey) {
 function allDayRowHTML(event) {
   const color    = App.getCategoryColor(event.category);
   const catLabel = event.category ? App.getCategoryLabel(event.category) : 'Unassigned';
-  const catColor = event.category ? color : 'rgba(255,255,255,0.38)';
+  const catColor = event.category ? color : 'rgba(100,100,100,0.3)';
+  const bgStyle  = event.category ? `background:${color}18;` : '';
+  const titleColor = event.category ? `color:${color}` : '';
   return `
-    <div class="entry-preview" onclick="openDetail('${escJS(event.id)}')">
-      <div class="entry-preview-bar" style="background:${catColor};height:36px"></div>
-      <div class="entry-preview-body">
-        <div class="entry-preview-title">${escHtml(event.title)}</div>
+    <div class="entry-preview" style="${bgStyle}" onclick="openDetail('${escJS(event.id)}')">
+      <div class="entry-preview-body" style="padding-left:4px">
+        <div class="entry-preview-title" style="${titleColor}">${escHtml(event.title)}</div>
         ${event.location?`<div class="entry-preview-time">📍 ${escHtml(event.location)}</div>`:''}
       </div>
-      <span class="entry-preview-cat" style="background:${catColor}22;color:${catColor}">${catLabel}</span>
+      <span class="cat-badge-plain" onclick="event.stopPropagation();openCategoryPicker('${escJS(event.id)}')">${catLabel}</span>
     </div>`;
 }
 
@@ -696,17 +698,18 @@ function entryCardHTML(event) {
   const color    = App.getCategoryColor(event.category);
   const catLabel = event.category ? App.getCategoryLabel(event.category) : 'Unassigned';
   const catIcon  = App.getCategoryIcon(event.category);
-  const catColor = event.category ? color : 'rgba(255,255,255,0.38)';
   const mapURL   = event.location ? `https://maps.apple.com/?q=${encodeURIComponent(event.location)}` : null;
-  const accentColor = event.category ? color : 'rgba(255,255,255,0.12)';
+
+  // Tinted background when assigned, plain surface when not
+  const bgStyle   = event.category ? `background:${color}18; border-color:${color}35;` : '';
+  const titleColor = event.category ? `color:${color}` : '';
 
   return `
-    <div class="entry-card" onclick="openDetail('${escJS(event.id)}')">
-      <div class="entry-card-accent" style="background:${accentColor}"></div>
+    <div class="entry-card" style="${bgStyle}" onclick="openDetail('${escJS(event.id)}')">
       <div class="entry-card-body">
         <div class="entry-card-header">
-          <div class="entry-card-title">${escHtml(event.title)}</div>
-          <span class="cat-badge" style="background:${catColor}22;color:${catColor}"
+          <div class="entry-card-title" style="${titleColor}">${escHtml(event.title)}</div>
+          <span class="cat-badge-plain"
                 onclick="event.stopPropagation();openCategoryPicker('${escJS(event.id)}')">
             ${catIcon} ${catLabel}
           </span>
