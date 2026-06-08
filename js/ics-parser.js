@@ -13,30 +13,33 @@ const ICSParser = {
       if (!event) continue;
 
       // Expand multi-day all-day events into one entry per day
-      // ICS spec: DTEND for all-day events is exclusive (end day not included)
+      // ICS spec: DTEND for all-day events is exclusive (the end date itself is NOT included)
+      // Example: DTSTART=20260621 DTEND=20260622 means "all of June 21st" (1 day)
+      //          DTSTART=20260621 DTEND=20260623 means "21st AND 22nd" (2 days)
       if (event.isAllDay && event.endDate && event.endDate > event.startDate) {
         const msPerDay = 86400000;
-        // Count how many days this event spans (endDate is exclusive so subtract 1)
-        const spanDays = Math.round((event.endDate - event.startDate) / msPerDay);
+        // Use floor not round — DTEND is exclusive, so 1ms past midnight on day 2
+        // still means a 1-day event.
+        const rawDiff  = (event.endDate - event.startDate) / msPerDay;
+        const spanDays = Math.floor(rawDiff + 0.0001); // tolerance for DST/precision
 
-        if (spanDays > 1) {
-          // Create one entry per day
+        // Only expand if event truly covers MORE than one day
+        // (i.e. DTEND is at least 2 days after DTSTART)
+        if (spanDays >= 2) {
           for (let d = 0; d < spanDays; d++) {
             const dayDate = new Date(event.startDate.getTime() + d * msPerDay);
             events.push({
               ...event,
-              // Give each day-entry a unique ID to avoid collisions
               id: d === 0 ? event.id : `${event.id}_day${d}`,
               startDate: dayDate,
               endDate:   dayDate,
               dayKey:    this.toDayKey(dayDate),
-              // Mark as a span so category picker still updates the base ID
               spanBaseId: event.id,
               spanDay: d,
               spanTotal: spanDays
             });
           }
-          continue; // Don't push original
+          continue;
         }
       }
 

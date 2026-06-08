@@ -313,7 +313,7 @@ function showApp() {
         <div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
-            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v28</span>
+            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v29</span>
           </div>
           <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>
@@ -637,28 +637,56 @@ function renderDayTab() {
 
   let html = '';
 
-  // ── Place card ──
-  // One place: show city name
-  // Two places: show "City A → City B" travel day card
-  if (placeEvents.length === 1) {
-    html += `
-      <div class="place-card">
-        <div class="place-card-pin">📍</div>
-        <div class="place-card-city">${escHtml(placeEvents[0].title)}</div>
-      </div>`;
-  } else if (placeEvents.length >= 2) {
-    // Sort by start time so departure comes first
-    const sorted = [...placeEvents].sort((a,b) => (a.startDate||a.date) - (b.startDate||b.date));
-    const from = sorted[0].title;
-    const to   = sorted[1].title;
+  // ── Place card logic ──
+  // A travel day is when TWO different Place events START on this day
+  // (i.e. one ends and another begins). Otherwise show a single city card.
+  //
+  // For multi-day Place events, only the FIRST day represents arrival.
+  // On subsequent days we're already in that city — show it as the
+  // current location, not a route.
+
+  // Events that BEGIN on this day (either single-day or first day of a span)
+  const startingHere = placeEvents.filter(e => !e.spanDay || e.spanDay === 0);
+  // Events that are continuing from an earlier day
+  const continuing   = placeEvents.filter(e => e.spanDay && e.spanDay > 0);
+
+  // Determine the "current" place on this day
+  let currentPlace = null;
+  let travelTo     = null;
+
+  if (startingHere.length >= 2) {
+    // Travel day — two cities starting here, sort by time
+    const sorted = [...startingHere].sort((a,b) => (a.startDate||0) - (b.startDate||0));
+    currentPlace = sorted[0];
+    travelTo     = sorted[1];
+  } else if (startingHere.length === 1 && continuing.length === 0) {
+    // One place starts today, nothing was already running — single arrival/single place
+    currentPlace = startingHere[0];
+  } else if (startingHere.length === 1 && continuing.length >= 1) {
+    // One place was already in progress, another starts today — travel day
+    // Departing: the one already in progress; Arriving: the new one
+    currentPlace = continuing[0];
+    travelTo     = startingHere[0];
+  } else if (continuing.length >= 1) {
+    // No new arrival today, just continuing in the same place
+    currentPlace = continuing[0];
+  }
+
+  if (currentPlace && travelTo) {
     html += `
       <div class="place-card place-card-travel">
         <div class="place-card-pin">✈️</div>
         <div class="place-card-route">
-          <span class="place-card-from">${escHtml(from)}</span>
+          <span class="place-card-from">${escHtml(currentPlace.title)}</span>
           <span class="place-card-arrow">→</span>
-          <span class="place-card-to">${escHtml(to)}</span>
+          <span class="place-card-to">${escHtml(travelTo.title)}</span>
         </div>
+      </div>`;
+  } else if (currentPlace) {
+    html += `
+      <div class="place-card">
+        <div class="place-card-pin">📍</div>
+        <div class="place-card-city">${escHtml(currentPlace.title)}</div>
       </div>`;
   }
 
