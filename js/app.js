@@ -313,7 +313,7 @@ function showApp() {
         <div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
-            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v26</span>
+            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v27</span>
           </div>
           <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>
@@ -622,8 +622,8 @@ function renderDayTab() {
   meta += events.length ? ` · ${events.length} event${events.length>1?'s':''}` : ' · Nothing scheduled';
   metaEl.textContent = meta;
 
-  // Find the Place-categorised event for this day
-  const placeEvent = events.find(e => e.category === 'place');
+  // Find all Place-categorised events for this day
+  const placeEvents = events.filter(e => e.category === 'place');
 
   if (events.length===0) {
     body.innerHTML = `
@@ -637,13 +637,28 @@ function renderDayTab() {
 
   let html = '';
 
-  // ── Place card — shown when an event is tagged as Place ──
-  // Title is the city name (user controls this in Calendar.app)
-  if (placeEvent) {
+  // ── Place card ──
+  // One place: show city name
+  // Two places: show "City A → City B" travel day card
+  if (placeEvents.length === 1) {
     html += `
       <div class="place-card">
         <div class="place-card-pin">📍</div>
-        <div class="place-card-city">${escHtml(placeEvent.title)}</div>
+        <div class="place-card-city">${escHtml(placeEvents[0].title)}</div>
+      </div>`;
+  } else if (placeEvents.length >= 2) {
+    // Sort by start time so departure comes first
+    const sorted = [...placeEvents].sort((a,b) => (a.startDate||a.date) - (b.startDate||b.date));
+    const from = sorted[0].title;
+    const to   = sorted[1].title;
+    html += `
+      <div class="place-card place-card-travel">
+        <div class="place-card-pin">✈️</div>
+        <div class="place-card-route">
+          <span class="place-card-from">${escHtml(from)}</span>
+          <span class="place-card-arrow">→</span>
+          <span class="place-card-to">${escHtml(to)}</span>
+        </div>
       </div>`;
   }
 
