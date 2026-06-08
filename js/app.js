@@ -313,7 +313,7 @@ function showApp() {
         <div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
-            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v25</span>
+            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v26</span>
           </div>
           <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>

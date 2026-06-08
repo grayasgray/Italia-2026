@@ -7,7 +7,7 @@
  * cache-first approach which caused stale versions to stick around.
  */
 
-const CACHE = 'italia2026-v26';
+const CACHE = 'italia2026-v27';
 
 // Files to pre-cache on install
 const PRECACHE_ASSETS = [
