@@ -313,7 +313,7 @@ function showApp() {
         <div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
-            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v29</span>
+            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v30</span>
           </div>
           <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>
@@ -638,38 +638,66 @@ function renderDayTab() {
   let html = '';
 
   // ── Place card logic ──
-  // A travel day is when TWO different Place events START on this day
-  // (i.e. one ends and another begins). Otherwise show a single city card.
+  // Rule: pick the MOST RECENTLY STARTED Place event as the current location.
+  // If two Place events START on the same day, that's a travel day → show route.
   //
-  // For multi-day Place events, only the FIRST day represents arrival.
-  // On subsequent days we're already in that city — show it as the
-  // current location, not a route.
+  // For multi-day Place events, `spanBaseId` lets us identify when an event
+  // truly starts (spanDay 0 or no spanDay at all).
 
-  // Events that BEGIN on this day (either single-day or first day of a span)
-  const startingHere = placeEvents.filter(e => !e.spanDay || e.spanDay === 0);
-  // Events that are continuing from an earlier day
-  const continuing   = placeEvents.filter(e => e.spanDay && e.spanDay > 0);
+  // Group all place events by their base (single-day events are their own base)
+  // Then for each base, find the FIRST occurrence in the trip to get its start date.
+  const placeBases = new Map(); // baseId → { startDate, title, dayKey }
+  App.events
+    .filter(e => e.category === 'place')
+    .forEach(e => {
+      const baseId = e.spanBaseId || e.id;
+      // Only record the first (earliest) instance — that's when this place "began"
+      if (!placeBases.has(baseId) || e.startDate < placeBases.get(baseId).startDate) {
+        placeBases.set(baseId, {
+          baseId,
+          title: e.title,
+          startDate: e.startDate,
+          startDayKey: App.toDayKey(e.startDate)
+        });
+      }
+    });
 
-  // Determine the "current" place on this day
+  // Convert to array, only include places that began ON OR BEFORE today
+  const dayKeyToday = dayKey;
+  const activeBases = Array.from(placeBases.values())
+    .filter(p => p.startDayKey <= dayKeyToday)
+    .sort((a,b) => a.startDate - b.startDate); // earliest first
+
+  // Now, which place events actually appear in TODAY's event list?
+  // (Those are the ones whose multi-day span covers today, OR start today)
+  const baseIdsHereToday = new Set(
+    placeEvents.map(e => e.spanBaseId || e.id)
+  );
+  const presentToday = activeBases.filter(p => baseIdsHereToday.has(p.baseId));
+
+  // Places that START on this exact day = arrivals
+  const arrivingToday = presentToday.filter(p => p.startDayKey === dayKeyToday);
+  // Places already in progress before today
+  const ongoing = presentToday.filter(p => p.startDayKey < dayKeyToday);
+
   let currentPlace = null;
   let travelTo     = null;
 
-  if (startingHere.length >= 2) {
-    // Travel day — two cities starting here, sort by time
-    const sorted = [...startingHere].sort((a,b) => (a.startDate||0) - (b.startDate||0));
-    currentPlace = sorted[0];
-    travelTo     = sorted[1];
-  } else if (startingHere.length === 1 && continuing.length === 0) {
-    // One place starts today, nothing was already running — single arrival/single place
-    currentPlace = startingHere[0];
-  } else if (startingHere.length === 1 && continuing.length >= 1) {
-    // One place was already in progress, another starts today — travel day
-    // Departing: the one already in progress; Arriving: the new one
-    currentPlace = continuing[0];
-    travelTo     = startingHere[0];
-  } else if (continuing.length >= 1) {
-    // No new arrival today, just continuing in the same place
-    currentPlace = continuing[0];
+  if (arrivingToday.length >= 2) {
+    // Two new places today — sort by event start time
+    currentPlace = arrivingToday[0];
+    travelTo     = arrivingToday[1];
+  } else if (arrivingToday.length === 1 && ongoing.length >= 1) {
+    // Travel day: leaving the ongoing place, arriving at the new one
+    // Pick the MOST RECENTLY started ongoing place as the departure point
+    currentPlace = ongoing[ongoing.length - 1];
+    travelTo     = arrivingToday[0];
+  } else if (arrivingToday.length === 1) {
+    // Just arrived today, nothing was ongoing
+    currentPlace = arrivingToday[0];
+  } else if (ongoing.length >= 1) {
+    // Already in a place, no new arrival → show most recently started
+    currentPlace = ongoing[ongoing.length - 1];
   }
 
   if (currentPlace && travelTo) {
