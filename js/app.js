@@ -313,7 +313,7 @@ function showApp() {
         <div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
-            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v27</span>
+            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v28</span>
           </div>
           <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>
@@ -668,7 +668,7 @@ function renderDayTab() {
   const timed  = nonPlaceEvents.filter(e=>!e.isAllDay);
 
   if (allDay.length) {
-    html += `<div class="allday-label" style="margin-top:${placeEvent?'4px':'0'}">All day</div>
+    html += `<div class="allday-label" style="margin-top:${placeEvents.length?'4px':'0'}">All day</div>
       <div class="allday-card">
         ${allDay.map(e=>allDayRowHTML(e)).join('')}
       </div>`;
