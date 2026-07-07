@@ -313,7 +313,7 @@ function showApp() {
         <div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <div class="topbar-title" id="cal-trip-name">${escHtml(Store.getTripName())}</div>
-            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v30</span>
+            <span style="font-family:var(--font);font-size:10px;color:var(--dim);letter-spacing:0.06em">v31</span>
           </div>
           <div class="topbar-sub" id="cal-trip-dest">${escHtml(Store.getDestination())}</div>
         </div>
@@ -323,7 +323,7 @@ function showApp() {
     </div>
 
     <!-- Day tab -->
-    <div id="screen-day" class="screen" style="padding-bottom:calc(60px + var(--sab))">
+    <div id="screen-day" class="screen">
       <div class="topbar">
         <div class="topbar-title">Day</div>
       </div>
@@ -350,7 +350,7 @@ function showApp() {
     </div>
 
     <!-- Assistant -->
-    <div id="screen-assistant" class="screen" style="padding-bottom:0">
+    <div id="screen-assistant" class="screen" style="padding-bottom:calc(96px + var(--sab))">
       <div class="topbar">
         <div>
           <div class="topbar-title">Assistant</div>
@@ -1064,7 +1064,8 @@ function initAssistant() {
   renderChatMessages();
   renderSuggestions();
   const input=document.getElementById('chat-input');
-  if (input) {
+  if (input && !input.dataset.bound) {
+    input.dataset.bound = '1';
     input.addEventListener('input',()=>{
       document.getElementById('chat-send-btn').disabled=!input.value.trim();
       input.style.height='auto';
